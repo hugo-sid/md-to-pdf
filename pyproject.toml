@@ -1,0 +1,7 @@
+[project]
+name = "md-to-pdf"
+version = "0.1.0"
+description = "AA website to convert Markdown to pdf, along with syntax highlighting &amp; image uploading."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
