@@ -4,13 +4,8 @@
     "dockerfile": "Dockerfile"
   },
   "remoteUser": "appuser",
+  "overrideCommand": true,
   "forwardPorts": [5000],
-  "portsAttributes": {
-    "5000": {
-      "label": "Flask",
-      "onAutoForward": "notify"
-    }
-  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -18,13 +13,7 @@
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
         "tamasfe.even-better-toml"
-      ],
-      "settings": {
-        "editor.formatOnSave": true,
-        "[python]": {
-          "editor.defaultFormatter": "charliermarsh.ruff"
-        }
-      }
+      ]
     }
   }
 }
