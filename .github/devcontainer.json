@@ -1,8 +1,7 @@
 {
   "name": "md-to-pdf",
   "build": {
-    "dockerfile": "Dockerfile",
-    "target": "builder"
+    "dockerfile": "Dockerfile"
   },
   "remoteUser": "appuser",
   "forwardPorts": [5000],
