@@ -1,21 +1,17 @@
 {
-  "name": "Python + Node Dev Environment",
-  "image": "mcr.microsoft.com/devcontainers/python:3.12-bullseye",
-
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "24.14.1"
-    },
-    "ghcr.io/devcontainers/features/git:1": {},
-      "ghcr.io/devcontainers/features/git-lfs:1": {
-        "autoPull": false
+  "name": "md-to-pdf",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "target": "builder"
+  },
+  "remoteUser": "appuser",
+  "forwardPorts": [5000],
+  "portsAttributes": {
+    "5000": {
+      "label": "Flask",
+      "onAutoForward": "notify"
     }
   },
-
-  "onCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh",
-
-  "postCreateCommand": "export PATH=$HOME/.local/bin:$PATH && node_ver=$(cat .node-version) && nvm install $node_ver && nvm use $node_ver && uv sync && npm install",
-
   "customizations": {
     "vscode": {
       "extensions": [
@@ -32,16 +28,5 @@
         }
       }
     }
-  },
-
-  "forwardPorts": [5000],
-
-  "portsAttributes": {
-    "5000": {
-      "label": "Flask",
-      "onAutoForward": "notify"
-    }
-  },
-
-  "remoteUser": "vscode"
+  }
 }
