@@ -4,14 +4,14 @@
 
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "none"
+      "version": "24.14.1"
     },
     "ghcr.io/devcontainers/features/git:1": {}
   },
 
   "onCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh",
 
-  "postCreateCommand": "export PATH=$HOME/.local/bin:$PATH && node_ver=$(cat .node-version) && nvm install $node_ver && nvm use $node_ver && uv sync && npm install",
+  "postCreateCommand": "uv sync && npm install",
 
   "customizations": {
     "vscode": {
