@@ -8,10 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libcairo2 \
     fonts-liberation \
+    curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user FIRST
+# Install uv globally
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    ln -s /root/.local/bin/uv /usr/local/bin/uv
+
+# Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /app
@@ -19,19 +24,13 @@ WORKDIR /app
 # Copy with proper ownership
 COPY --chown=appuser:appuser . .
 
-# Install uv as root, then switch to appuser
-RUN apt-get update && apt-get install -y curl && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Switch to appuser BEFORE running uv
+# Switch to appuser
 USER appuser
 
-ENV PATH="/home/appuser/.local/bin:/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Now install dependencies
+# Now install dependencies as appuser
 RUN uv sync
 
 EXPOSE 5000
