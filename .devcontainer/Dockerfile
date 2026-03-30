@@ -12,22 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv globally (as root)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    # Make uv executable by all users
-    chmod +x /root/.local/bin/uv && \
-    # Symlink to a system-wide location
-    ln -s /root/.local/bin/uv /usr/local/bin/uv && \
-    ln -s /root/.local/bin/uvx /usr/local/bin/uvx && \
-    # Ensure the symlinks are accessible
-    chmod +x /usr/local/bin/uv /usr/local/bin/uvx
+    mv /root/.local/bin/uv /usr/local/bin/uv && \
+    mv /root/.local/bin/uvx /usr/local/bin/uvx
 
-# Make uv available system-wide by symlinking it
-RUN ln -s /root/.local/bin/uv /usr/local/bin/uv && \
-    ln -s /root/.local/bin/uvx /usr/local/bin/uvx
-
-# Create non-root user AFTER uv is installed globally
 RUN useradd --create-home --shell /bin/bash appuser
+USER appuser
 
 WORKDIR /app
 
