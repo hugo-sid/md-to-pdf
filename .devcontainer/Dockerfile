@@ -11,31 +11,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Create non-root user FIRST
+RUN useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /app
 
-# Copy everything (simpler for dev)
-COPY . .
+# Copy with proper ownership
+COPY --chown=appuser:appuser . .
 
-# Install dependencies (including your project if needed)
-RUN uv sync
+# Install uv as root, then switch to appuser
+RUN apt-get update && apt-get install -y curl && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash appuser \
-    && chown -R appuser:appuser /app
-
+# Switch to appuser BEFORE running uv
 USER appuser
 
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/home/appuser/.local/bin:/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+# Now install dependencies
+RUN uv sync
+
 EXPOSE 5000
 
-CMD ["gunicorn", \
-     "--workers", "2", \
-     "--bind", "0.0.0.0:5000", \
-     "--timeout", "120", \
-     "app:app"]
+CMD ["bash"]

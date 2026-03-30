@@ -1,10 +1,11 @@
 {
   "name": "md-to-pdf",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
   "remoteUser": "appuser",
-  "overrideCommand": true,
+  "overrideCommand": false,
   "forwardPorts": [5000],
   "customizations": {
     "vscode": {
