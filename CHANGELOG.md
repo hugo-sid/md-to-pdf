@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/hugo-sid/md-to-pdf/compare/v1.0.0...v1.0.1) (2026-03-30)
+
+
+### Bug Fixes
+
+* **devcontainer:** install packages as post create command rather than in DOckerfile ([fe9897a](https://github.com/hugo-sid/md-to-pdf/commit/fe9897ab42f3b7230db9930726a0f4e5b32bf6c5))
+
 # 1.0.0 (2026-03-30)
 
 
