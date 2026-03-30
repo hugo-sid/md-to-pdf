@@ -45,12 +45,6 @@ RUN . $NVM_DIR/nvm.sh && \
     nvm install $NODE_VERSION && \
     nvm alias default $NODE_VERSION
 
-# Install npm dependencies
-RUN . $NVM_DIR/nvm.sh && npm install
-
-# Install Python dependencies
-RUN uv sync
-
 EXPOSE 5000
 
 CMD ["sleep", "infinity"]
