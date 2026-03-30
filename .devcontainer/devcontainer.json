@@ -7,7 +7,10 @@
   "remoteUser": "appuser",
   "overrideCommand": false,
   "forwardPorts": [5000],
-  "postCreateCommand": "npm install && uv sync",
+  "remoteEnv": {
+    "UV_LINK_MODE": "copy"
+  },
+  "postCreateCommand": "git config pull.rebase true && npm install && uv sync",
   "customizations": {
     "vscode": {
       "extensions": [
