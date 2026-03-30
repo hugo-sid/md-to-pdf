@@ -34,5 +34,3 @@ ENV PYTHONUNBUFFERED=1 \
 RUN uv sync
 
 EXPOSE 5000
-
-CMD ["bash"]
