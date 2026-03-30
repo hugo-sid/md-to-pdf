@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MD → PDF</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0e0e14;
+  --surface:  #15151f;
+  --panel:    #1a1a28;
+  --border:   #2a2a3d;
+  --accent:   #7b6ef6;
+  --accent2:  #22d3ee;
+  --success:  #4ade80;
+  --danger:   #f87171;
+  --text:     #e2e2f0;
+  --muted:    #6b6b8a;
+  --mono:     'JetBrains Mono', monospace;
+  --serif:    'Source Serif 4', Georgia, serif;
+  --display:  'Syne', sans-serif;
+  --header-h: 54px;
+  --bar-h:    28px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+
+/* ── UPLOAD PROGRESS BAR ── */
+#upload-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  z-index: 9999;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: var(--border);
+  pointer-events: none;
+}
+#upload-bar.active { opacity: 1; }
+#upload-bar-fill {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+  background-size: 200% 100%;
+  border-radius: 0 2px 2px 0;
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { width: 60%; }
+  100% { transform: translateX(300%); width: 40%; }
+}
+
+/* ── UPLOAD TOAST (GitHub-style) ── */
+#img-toast {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 18px 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  opacity: 0;
+  transition: all 0.25s ease;
+  pointer-events: none;
+  z-index: 500;
+  white-space: nowrap;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+#img-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#img-toast .toast-icon { font-size: 1rem; }
+
+/* ── HEADER ── */
+header {
+  height: var(--header-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 14px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+
+.logo {
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-arrow {
+  color: var(--accent);
+  font-size: 0.9em;
+  font-weight: 500;
+}
+.logo-pdf { color: var(--accent2); }
+
+.header-mid {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  color: var(--muted);
+}
+.live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: blink 2.5s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 7px 15px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.16s;
+  white-space: nowrap;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); background: rgba(255,255,255,0.04); }
+
+.btn-export {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(123,110,246,0.35);
+}
+.btn-export:hover { background: #9585f8; box-shadow: 0 0 26px rgba(123,110,246,0.55); transform: translateY(-1px); }
+.btn-export:active { transform: translateY(0); }
+.btn-export:disabled { opacity: 0.5; pointer-events: none; }
+
+/* ── WORKSPACE ── */
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 3px 1fr;
+  height: calc(100vh - var(--header-h) - var(--bar-h));
+  overflow: hidden;
+}
+
+/* ── PANE HEADERS ── */
+.pane { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 36px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+.pane-title {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pane-badge {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.06em;
+}
+.badge-editor { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+.badge-preview { background: rgba(74,222,128,0.10); color: var(--success); border: 1px solid rgba(74,222,128,0.2); }
+
+.paste-hint {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.59rem;
+  color: var(--muted);
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.kbd {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.58rem;
+  color: var(--muted);
+}
+
+/* ── EDITOR ── */
+#editor {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 22px 24px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.8;
+  color: #c9c8e8;
+  background: var(--bg);
+  tab-size: 2;
+  overflow: auto;
+  caret-color: var(--accent2);
+}
+#editor::selection { background: rgba(123,110,246,0.28); }
+#editor::placeholder { color: var(--muted); }
+
+/* Drag-over highlight */
+#editor.drag-over {
+  background: rgba(123,110,246,0.06);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ── DIVIDER ── */
+.divider {
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.divider:hover, .divider.dragging { background: var(--accent); }
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -4px; right: -4px;
+}
+
+/* ── PREVIEW ── */
+#preview-wrap {
+  flex: 1;
+  overflow: auto;
+  background: var(--panel);
+}
+#preview {
+  padding: 28px 32px;
+  font-family: var(--serif);
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #d0cfea;
+  max-width: 820px;
+}
+
+/* Preview typography */
+#preview h1, #preview h2, #preview h3, #preview h4 {
+  font-family: var(--display);
+  color: var(--text);
+  margin-top: 1.6em;
+  margin-bottom: 0.4em;
+  font-weight: 700;
+}
+#preview h1 { font-size: 1.85em; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 0.3em; }
+#preview h2 { font-size: 1.38em; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+#preview h3 { font-size: 1.12em; }
+#preview p  { margin-bottom: 0.9em; }
+
+#preview a { color: var(--accent2); text-decoration: none; border-bottom: 1px solid rgba(34,211,238,0.3); transition: border-color 0.15s; }
+#preview a:hover { border-bottom-color: var(--accent2); }
+
+/* inline code only — NOT inside fenced blocks */
+#preview :not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  background: rgba(255,255,255,0.07);
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--accent2);
+}
+
+/* kill any background leaking onto spans inside highlight blocks */
+#preview .highlight span {
+  background: transparent !important;
+}
+
+/* Pygments syntax highlight blocks — styled via /pygments.css */
+#preview .highlight {
+  border-radius: 8px;
+  margin: 1.3em 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  font-size: 0.81rem;
+  line-height: 1.6;
+}
+#preview .highlight pre {
+  margin: 0;
+  padding: 18px 22px;
+  overflow-x: auto;
+}
+#preview .highlight pre code { background: none; padding: 0; color: inherit; font-size: 1em; }
+
+#preview blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 1em 0;
+  padding: 10px 20px;
+  background: rgba(123,110,246,0.07);
+  color: var(--muted);
+  font-style: italic;
+  border-radius: 0 6px 6px 0;
+}
+
+#preview table { border-collapse: collapse; width: 100%; margin: 1.2em 0; font-size: 0.92em; }
+#preview th { background: var(--surface); color: var(--text); padding: 10px 14px; text-align: left; font-family: var(--mono); font-size: 0.73em; letter-spacing: 0.07em; text-transform: uppercase; border-bottom: 2px solid var(--accent); }
+#preview td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+#preview tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+#preview hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+#preview ul, #preview ol { padding-left: 1.6em; margin-bottom: 0.9em; }
+#preview li { margin: 0.3em 0; }
+#preview img { max-width: 100%; border-radius: 6px; border: 1px solid var(--border); margin: 0.5em 0; }
+
+/* task list */
+#preview .task-list-item { list-style: none; margin-left: -1.2em; }
+#preview .task-list-item input { margin-right: 6px; accent-color: var(--accent); }
+
+/* ── STATUS BAR ── */
+.statusbar {
+  height: var(--bar-h);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 20px;
+  flex-shrink: 0;
+}
+.stat {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.stat b { color: rgba(226,226,240,0.7); font-weight: 400; }
+.stat-right { margin-left: auto; }
+
+/* ── GENERAL TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 48px;
+  right: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 16px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.22s ease;
+  pointer-events: none;
+  z-index: 400;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.ok   { border-color: rgba(74,222,128,0.4); color: var(--success); }
+.toast.err  { border-color: rgba(248,113,113,0.4); color: var(--danger); }
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- indeterminate upload progress bar -->
+<div id="upload-bar"><div id="upload-bar-fill"></div></div>
+
+<!-- GitHub-style upload toast -->
+<div id="img-toast"><span class="toast-icon">🖼</span><span id="img-toast-msg">Uploading image…</span></div>
+
+<header>
+  <div class="logo">
+    <span>md</span>
+    <span class="logo-arrow">→</span>
+    <span class="logo-pdf">pdf</span>
+  </div>
+
+  <div class="header-mid">
+    <div class="live-dot"></div>
+    <span id="server-status">live preview</span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="loadSample()">Sample</button>
+    <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+    <button class="btn btn-export" id="export-btn" onclick="exportPDF()">⬇ Export PDF</button>
+  </div>
+</header>
+
+<div class="workspace" id="workspace">
+
+  <!-- LEFT: editor -->
+  <div class="pane">
+    <div class="pane-head">
+      <span class="pane-title">Source</span>
+      <span class="pane-badge badge-editor">markdown</span>
+      <span class="paste-hint">
+        <span class="kbd">Ctrl</span>+<span class="kbd">V</span> to paste image
+      </span>
+    </div>
+    <textarea id="editor"
+      spellcheck="false"
+      placeholder="# Hello World&#10;&#10;Start writing markdown — or paste / drop an image…"></textarea>
+  </div>
+
+  <div class="divider" id="divider"></div>
+
+  <!-- RIGHT: preview -->
+  <div class="pane">
+    <div class="pane-head">
+      <span class="pane-title">Preview</span>
+      <span class="pane-badge badge-preview">rendered</span>
+      <span class="paste-hint" style="margin-left:auto">
+        render: <b id="render-ms" style="color:rgba(226,226,240,0.6)">—</b>
+      </span>
+    </div>
+    <div id="preview-wrap">
+      <div id="preview"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="statusbar">
+  <div class="stat">words <b id="s-words">0</b></div>
+  <div class="stat">lines <b id="s-lines">0</b></div>
+  <div class="stat">chars <b id="s-chars">0</b></div>
+  <div class="stat">images <b id="s-imgs">0</b></div>
+  <div class="stat stat-right" id="s-file">untitled.md</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── ELEMENTS ────────────────────────────────────────────────────────────────
+const editor     = document.getElementById('editor');
+const preview    = document.getElementById('preview');
+const uploadBar  = document.getElementById('upload-bar');
+const imgToast   = document.getElementById('img-toast');
+const imgToastMsg= document.getElementById('img-toast-msg');
+let imgCount     = 0;
+let debounce     = null;
+
+// ── LIVE PREVIEW ─────────────────────────────────────────────────────────────
+editor.addEventListener('input', () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(renderPreview, 200);
+  updateStats();
+});
+
+async function renderPreview() {
+  const md = editor.value;
+  if (!md.trim()) {
+    preview.innerHTML = '<p style="color:var(--muted);font-style:italic;padding:8px 0">Nothing to preview yet…</p>';
+    return;
+  }
+  try {
+    const t0  = performance.now();
+    const res = await fetch('/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markdown: md }),
+    });
+    const data = await res.json();
+    preview.innerHTML = data.html;
+    document.getElementById('render-ms').textContent = `${Math.round(performance.now() - t0)}ms`;
+  } catch {
+    showToast('Server unreachable', 'err');
+  }
+}
+
+// ── STATS ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const v = editor.value;
+  document.getElementById('s-words').textContent = v.trim() ? v.trim().split(/\s+/).length : 0;
+  document.getElementById('s-lines').textContent = v.split('\n').length;
+  document.getElementById('s-chars').textContent = v.length;
+  document.getElementById('s-imgs').textContent  = imgCount;
+}
+
+// ── IMAGE UPLOAD ──────────────────────────────────────────────────────────────
+function showUploadProgress(msg = 'Uploading image…') {
+  imgToastMsg.textContent = msg;
+  uploadBar.classList.add('active');
+  imgToast.classList.add('show');
+}
+
+function hideUploadProgress() {
+  uploadBar.classList.remove('active');
+  setTimeout(() => imgToast.classList.remove('show'), 1200);
+}
+
+async function uploadDataUrl(dataUrl, mimeHint) {
+  showUploadProgress('Uploading image…');
+  try {
+    const res  = await fetch('/upload-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataUrl }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.url;
+  } finally {
+    hideUploadProgress();
+  }
+}
+
+async function uploadFile(file) {
+  showUploadProgress(`Uploading ${file.name}…`);
+  try {
+    const form = new FormData();
+    form.append('image', file);
+    const res  = await fetch('/upload-image', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.url;
+  } finally {
+    hideUploadProgress();
+  }
+}
+
+function insertImageMarkdown(url, alt = 'image') {
+  const md   = `![${alt}](${url})`;
+  const pos  = editor.selectionStart;
+  const before = editor.value.slice(0, pos);
+  const after  = editor.value.slice(pos);
+  // add newlines around if needed
+  const pre  = (before.length && !before.endsWith('\n')) ? '\n' : '';
+  const post = (after.length  && !after.startsWith('\n')) ? '\n' : '';
+  editor.value = before + pre + md + post + after;
+  editor.selectionStart = editor.selectionEnd = pos + pre.length + md.length;
+  imgCount++;
+  updateStats();
+  renderPreview();
+}
+
+// ── PASTE ─────────────────────────────────────────────────────────────────────
+editor.addEventListener('paste', async (e) => {
+  const items = Array.from(e.clipboardData.items);
+  const imgItem = items.find(i => i.type.startsWith('image/'));
+  if (!imgItem) return; // let normal text paste through
+
+  e.preventDefault();
+
+  const file   = imgItem.getAsFile();
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      const url = await uploadDataUrl(ev.target.result, imgItem.type);
+      insertImageMarkdown(url, 'pasted-image');
+      showToast('Image uploaded ✓', 'ok');
+    } catch (err) {
+      showToast(`Upload failed: ${err.message}`, 'err');
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+// ── DRAG & DROP ───────────────────────────────────────────────────────────────
+editor.addEventListener('dragover', (e) => { e.preventDefault(); editor.classList.add('drag-over'); });
+editor.addEventListener('dragleave', () => editor.classList.remove('drag-over'));
+editor.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  editor.classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  for (const file of files) {
+    try {
+      const url = await uploadFile(file);
+      insertImageMarkdown(url, file.name.replace(/\.[^.]+$/, ''));
+      showToast(`${file.name} uploaded ✓`, 'ok');
+    } catch (err) {
+      showToast(`Upload failed: ${err.message}`, 'err');
+    }
+  }
+});
+
+// ── PDF EXPORT ────────────────────────────────────────────────────────────────
+async function exportPDF() {
+  const btn = document.getElementById('export-btn');
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/export-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markdown: editor.value }),
+    });
+    if (!res.ok) {
+      const e = await res.json();
+      showToast(e.error || 'Export failed', 'err');
+      return;
+    }
+    const disp  = res.headers.get('Content-Disposition') || '';
+    const match = disp.match(/filename="?([^"]+)"?/);
+    const fname = match ? match[1] : 'document.pdf';
+    const blob  = await res.blob();
+    const a     = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob), download: fname
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast(`Saved as ${fname}`, 'ok');
+  } catch {
+    showToast('Export failed — server error', 'err');
+  } finally {
+    btn.textContent = '⬇ Export PDF';
+    btn.disabled = false;
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = `toast show ${type}`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = 'toast', 3200);
+}
+
+// ── CLEAR ─────────────────────────────────────────────────────────────────────
+function clearAll() {
+  if (!editor.value || confirm('Clear everything?')) {
+    editor.value = '';
+    preview.innerHTML = '';
+    imgCount = 0;
+    updateStats();
+  }
+}
+
+// ── SAMPLE ───────────────────────────────────────────────────────────────────
+function loadSample() {
+  editor.value = `# Project Report — Q3 2025
+
+## Summary
+
+This document outlines deliverables for **Q3 2025**, tracking progress across all engineering initiatives.
+
+## Syntax Highlighting
+
+Python snippet:
+
+\`\`\`python
+import asyncio
+from dataclasses import dataclass
+
+@dataclass
+class Report:
+    title: str
+    quarter: str
+    score: float = 0.0
+
+async def generate(report: Report) -> dict:
+    await asyncio.sleep(0.1)
+    return {"title": report.title, "score": report.score}
+\`\`\`
+
+Bash:
+
+\`\`\`bash
+#!/bin/bash
+pip install -r requirements.txt
+python app.py --port 5000
+\`\`\`
+
+## Milestones
+
+| Phase    | Owner | Status      | Due        |
+|----------|-------|-------------|------------|
+| Design   | Alice | ✅ Complete | July 1     |
+| Build    | Team  | 🔄 In progress | Aug 15  |
+| QA       | Bob   | ⏳ Pending  | Sept 1     |
+
+## Notes
+
+> All deadlines subject to resource availability.
+> Escalate blockers to eng-leads immediately.
+
+- [x] Architecture review done
+- [x] API contracts signed off
+- [ ] Load testing scheduled
+- [ ] Docs updated
+
+---
+*Prepared by the engineering team · ${new Date().toLocaleDateString()}*
+`;
+  imgCount = 0;
+  renderPreview();
+  updateStats();
+}
+
+// ── DRAG DIVIDER ─────────────────────────────────────────────────────────────
+const divider  = document.getElementById('divider');
+const workspace= document.getElementById('workspace');
+let dragging   = false;
+
+divider.addEventListener('mousedown', e => { dragging = true; divider.classList.add('dragging'); e.preventDefault(); });
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const r   = workspace.getBoundingClientRect();
+  const pct = Math.min(Math.max((e.clientX - r.left) / r.width * 100, 20), 80);
+  workspace.style.gridTemplateColumns = `${pct}% 3px ${100 - pct}%`;
+});
+document.addEventListener('mouseup', () => { dragging = false; divider.classList.remove('dragging'); });
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+loadSample();
+</script>
+</body>
+</html>
