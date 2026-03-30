@@ -18,38 +18,38 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     mv /root/.local/bin/uv /usr/local/bin/uv && \
     mv /root/.local/bin/uvx /usr/local/bin/uvx
 
-# Install fnm (Fast Node Manager) to manage Node versions
-RUN curl -fsSL https://fnm.io/install | bash -s -- --install-dir /usr/local/bin && \
-    chmod +x /usr/local/bin/fnm
-
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser
 USER appuser
 
 WORKDIR /app
 
-# Copy with proper ownership
+# Copy with proper ownership (including .node-version)
 COPY --chown=appuser:appuser . .
 
 # Switch to appuser
 USER appuser
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/home/appuser/.local/share/fnm:$PATH"
+    PYTHONDONTWRITEBYTECODE=1
 
-# Read .node-version and install that Node version
-RUN if [ -f .node-version ]; then \
-      NODE_VERSION=$(cat .node-version) && \
-      fnm install $NODE_VERSION && \
-      fnm use $NODE_VERSION; \
-    fi
+# Install nvm (Node Version Manager)
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
-# Now install Python dependencies
-RUN uv sync
+# Setup nvm and install Node version from .node-version
+ENV NVM_DIR=/home/appuser/.nvm
+ENV PATH=$NVM_DIR/versions/node/v24.14.1/bin:$NVM_DIR/bin:$PATH
+
+RUN . $NVM_DIR/nvm.sh && \
+    NODE_VERSION=$(cat .node-version) && \
+    nvm install $NODE_VERSION && \
+    nvm alias default $NODE_VERSION
 
 # Install npm dependencies
-RUN npm install
+RUN . $NVM_DIR/nvm.sh && npm install
+
+# Install Python dependencies
+RUN uv sync
 
 EXPOSE 5000
 
