@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"   # only bind to localhost — nginx sits in front
+    volumes:
+      - uploads:/app/uploads     # persist images across restarts/deploys
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  uploads:
+    driver: local
