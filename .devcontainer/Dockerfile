@@ -12,11 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv globally
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    ln -s /root/.local/bin/uv /usr/local/bin/uv
+# Install uv globally (as root, so it's in /root/.local/bin)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create non-root user
+# Make uv available system-wide by symlinking it
+RUN ln -s /root/.local/bin/uv /usr/local/bin/uv && \
+    ln -s /root/.local/bin/uvx /usr/local/bin/uvx
+
+# Create non-root user AFTER uv is installed globally
 RUN useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /app
@@ -30,7 +33,7 @@ USER appuser
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Now install dependencies as appuser
+# Now install dependencies as appuser - uv is available via symlink
 RUN uv sync
 
 EXPOSE 5000
