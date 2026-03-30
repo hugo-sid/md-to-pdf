@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/hugo-sid/md-to-pdf/compare/v1.0.1...v1.1.0) (2026-03-30)
+
+
+### Bug Fixes
+
+* uv installation error, use git rebase during pull ([f3a4098](https://github.com/hugo-sid/md-to-pdf/commit/f3a4098d39416ceb87977731437e379d6e49e98f))
+
+
+### Features
+
+* basic md to pdf ready ([daa8952](https://github.com/hugo-sid/md-to-pdf/commit/daa8952bd5b65cdfac1e8464f0c6ea87417feae2))
+
 ## [1.0.1](https://github.com/hugo-sid/md-to-pdf/compare/v1.0.0...v1.0.1) (2026-03-30)
 
 
